@@ -1,22 +1,30 @@
 import React, {useState, useEffect} from "react";
-import {View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Button} from "react-native";
+import {View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Button, ActivityIndicator} from "react-native";
 import {Ionicons} from '@expo/vector-icons';
 import moment from "moment";
 import * as firebase from "firebase";
 import Fire from "../Fire";
 
 export default function Home(props) {
-    const [allPosts, setPosts] = useState([]);
-    const [displayName, setDisplayName] = useState("");
-    const postsAll=[];
+    const [postsTemp, setPosts] = useState([]);
+    const posts=[];
+
 
     useEffect(()=>{
-
         Fire.shared.firestore.collection('posts').get()
             .then(snapshot => {
                 snapshot.forEach(doc => {
                     /*console.log(doc.id, '=>', doc.data());*/
-                    postsAll.push(doc.data())
+                    let post=doc.data();
+                    post.id=doc.id;
+                    Fire.shared.firestore
+                        .collection("users")
+                        .doc(post.uid)
+                        .onSnapshot(docUser => {
+                            post.user=docUser.data();
+                            /*setPosts(oldPosts=>[...oldPosts, post])*/
+                            posts.push(post)
+                        });
                 });
             })
             .catch(err => {
@@ -24,43 +32,29 @@ export default function Home(props) {
             });
     },[]);
 
-
-    const posts = [
-        {
-            id: "1",
-            name: "Joe McKay",
-            text:
-                "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            timestamp: 1569109273726,
-            avatar: require("../assets/noImg.png"),
-            image: require("../assets/icon.png")
-        },
-        {
-            id: "2",
-            name: "Karyn Kim",
-            text:
-                "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
-            timestamp: 1569109273726,
-            avatar: require("../assets/noImg.png"),
-            image: require("../assets/icon.png")
-        }
-    ];
-
     const renderPost = post => {
         return (
             <View style={styles.feedItem}>
-                <Image source={post.avatar} style={styles.avatar}/>
+                <Image source={
+                    post.user.avatar
+                        ? {uri: post.user.avatar}
+                        : require("../assets/noImg.png")
+                } style={styles.avatar}/>
                 <View style={{flex: 1}}>
                     <View style={{flexDirection: "row", justifyContent: "space-between", alignItems: "center"}}>
                         <View>
-                            <Text style={styles.name}>{post.name}</Text>
+                            <Text style={styles.name}>{post.user.name}</Text>
                             <Text style={styles.timestamp}>{moment(post.timestamp).fromNow()}</Text>
                         </View>
 
                         <Ionicons name="ios-more" size={24} color="#73788B"/>
                     </View>
                     <Text style={styles.post}>{post.text}</Text>
-                    <Image source={post.image} style={styles.postImage} resizeMode="cover"/>
+                    <Image source={
+                        post.image
+                            ? {uri: post.image}
+                            : require("../assets/splash.png")
+                    } style={styles.postImage} resizeMode="cover"/>
                     <View style={{flexDirection: "row"}}>
                         <Ionicons name="ios-heart-empty" size={24} color="#73788B" style={{marginRight: 16}}/>
                         <Ionicons name="ios-chatboxes" size={24} color="#73788B"/>
@@ -69,13 +63,21 @@ export default function Home(props) {
             </View>
         );
     };
+    if (posts.length<1){
+        return (
+            <View style={styles.loading}>
+                <Text>Loading...</Text>
+                <ActivityIndicator size="large"/>
+            </View>
+        );
+    } else {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Feed</Text>
             </View>
             <View>
-                <Button onPress={()=>console.log(postsAll)} title='hehe'/>
+                <Button onPress={()=>console.log(posts)} title='hehe'/>
             </View>
 
             <FlatList
@@ -87,9 +89,15 @@ export default function Home(props) {
             />
         </View>
     );
+    }
 }
 
 const styles = StyleSheet.create({
+    loading:{
+        flex:1,
+        justifyContent: "center",
+        alignItems: "center"
+    },
     container: {
         flex: 1,
         backgroundColor: "#EBECF4"
